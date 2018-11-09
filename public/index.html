@@ -1,0 +1,252 @@
+<head>
+    <title>Săpunăreală</title>
+</head>
+    <div id="div_not_logged_in">
+        <h1>Register</h1>
+        Username:<input id="register_username" type="text" placeholder="Desired Username..." maxlength="30">
+        Password:<input id="register_password" type="password" placeholder="Your Password...">
+        <input type="submit" value="Register" onclick="register()">
+
+        <h1>Login</h1>
+        Username:<input id="login_username" type="text" placeholder="Your Username..." maxlength="30">
+        Password:<input id="login_password" type="password" placeholder="Your Password...">
+        <input type="submit" value="Login" onclick="login()">
+    </div>
+
+    <div id="div_logged_in">
+        <h1>Log out</h1>
+        <input type="submit" value="Log out" onclick="logout()">
+
+        <h1>Add Project</h1>
+        Project Name: <input id="project_name" type="text" placeholder="Your project's name..." maxlength="50"><br><br>
+        Project Description<br>
+        <textarea id="project_description" rows="4" cols="50" placeholder="Your project's description goes here..." maxlength="256"></textarea><br><br>
+        <input type="submit" value="Add Project" onclick="addProject()">
+    </div>
+
+    <h1>Project list</h1>
+    <div id="projects">
+        <table id="projectsTable" style="text-align: center">
+            <tr>
+                <th>Delete</th>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Project Creator</th>
+            </tr>
+        </table>
+        <div id="projects_no_projects_damn" style="display: none">
+            Uh oh... there are no projects to show right now. You should add some!<br><br>
+        </div>
+        <button onclick="readProjects()">Refresh</button>
+    </div>
+    <div id="projects_pls_log_in">
+        Hey! Please log in in order to see your created projects.
+    </div>
+
+    <script>
+        // Messages
+        const ERR_AN_ERROR_HAS_OCCURRED = "An error has occurred when processing your request. Please try again."
+        const ERR_SSID_HAS_EXPIRED = "Your Session has expired (or is corrupted). Please log in again in order to proceed."
+
+        // Important, very few global variables
+        let ssid = localStorage.getItem("ssid")
+        let projects = []
+
+        if(!ssid) setLoggedOutState();
+        else setLoggedInState()
+
+        // Functions
+        function defaultFailureCallback(){
+            alert(ERR_AN_ERROR_HAS_OCCURRED)
+        }
+
+        function defaultFailureCallback_SSID_expired_variation(req){
+            if(req.status == 401){
+                logout()
+                alert(ERR_SSID_HAS_EXPIRED)
+            }
+            else alert(ERR_AN_ERROR_HAS_OCCURRED)
+        }
+
+        function callApi(apiName, data, successCallback, failureCallback = defaultFailureCallback){
+            let req = new XMLHttpRequest();
+
+            req.onreadystatechange = () => {
+                if(req.readyState == 4) {
+                    if (req.status == 200) {
+                        if(req.responseText)
+                            successCallback(JSON.parse(req.responseText))
+                        else
+                            successCallback()
+                    }
+                    else {
+                        failureCallback(req)
+                    }
+                }
+            }
+
+            req.open("POST", apiName)
+            req.setRequestHeader("Content-Type", "application/json")
+            req.send(JSON.stringify(data))
+        }
+
+        function loggedin(data){ // User has logged in. We know their ssid.
+            console.log("Received data: ")
+            console.log(data)
+            localStorage.setItem("ssid", data.ssid)
+            ssid = data.ssid
+            setLoggedInState()
+        }
+
+        function logout(){
+            localStorage.removeItem("ssid")
+
+            document.getElementById("register_username").value = ""
+            document.getElementById("register_password").value = ""
+            document.getElementById("login_username").value = ""
+            document.getElementById("login_password").value = ""
+
+            setLoggedOutState()
+        }
+
+        function setLoggedOutState(){
+            ssid = null
+            document.getElementById("projects").style.display = "none" // Hide Projects
+            document.getElementById("projects_pls_log_in").style.display = "block" // Show "pls log in bro"
+            document.getElementById("div_not_logged_in").style.display = "block"
+            document.getElementById("div_logged_in").style.display = "none"
+        }
+
+        function setLoggedInState(){
+            document.getElementById("projects").style.display = "block" // Show Projects
+            document.getElementById("projects_pls_log_in").style.display = "none" // Hide "pls log in bro"
+            document.getElementById("div_not_logged_in").style.display = "none"
+            document.getElementById("div_logged_in").style.display = "block"
+            console.log("ssid = "+ssid)
+            readProjects()
+        }
+
+        function refreshProjects(){
+            removeShownProjects()
+            let tableSelector = document.querySelector("#projects table tbody")
+            for(project of projects)
+                tableSelector.innerHTML += `
+                    <tr>
+                        <td><button onclick="removeProject(this)">X</button></td>
+                        <td>${project.id}</td>
+                        <td>${project.name}</td>
+                        <td>${project.description}</td>
+                        <td>${project.creator_username}</td>
+                    </tr>`
+            if(projects.length == 0){
+                document.getElementById("projectsTable").style.display = "none"
+                document.getElementById("projects_no_projects_damn").style.display = "block"
+            }
+            else {
+                document.getElementById("projectsTable").style.display = "block"
+                document.getElementById("projects_no_projects_damn").style.display = "none"
+            }
+        }
+
+        function removeShownProjects(){
+            for(let row of document.querySelectorAll("#projects table tbody tr:nth-child(n+2)"))
+                row.remove()
+        }
+
+        // Functions that call APIs
+        function register(){
+            let data = {
+                data: {
+                    username: document.getElementById("register_username").value,
+                    password: document.getElementById("register_password").value,
+                }
+            }
+
+            if(!data.data.username) return alert("Username cannot be empty!")
+            if(!data.data.password) return alert("Password cannot be empty!")
+
+            let failureCallback = (req) => {
+                if(req.status == 409) return alert("Username is already taken!")
+                else return alert(ERR_AN_ERROR_HAS_OCCURRED)
+            }
+
+            callApi("/register", data, loggedin, failureCallback)
+        }
+
+        function login(){
+            let data = {
+                data: {
+                    username: document.getElementById("login_username").value,
+                    password: document.getElementById("login_password").value,
+                }
+            }
+
+            if(!data.data.username) return alert("Username cannot be empty!")
+            if(!data.data.password) return alert("Password cannot be empty!")
+
+            let failureCallback = (req) => {
+                if(req.status == 401) return alert("Login failed! Check your credentials and try again.")
+                else return alert(ERR_AN_ERROR_HAS_OCCURRED)
+            }
+
+            callApi("/login", data, loggedin, failureCallback)
+        }
+
+        function readProjects(){
+            let data = {
+                auth: {
+                    ssid: ssid
+                }
+            }
+
+            let successCallback = (data) => {
+                projects = data
+                refreshProjects()
+            }
+
+            callApi("/readProjects", data, successCallback, defaultFailureCallback_SSID_expired_variation)
+        }
+
+        function addProject(){
+            let data = {
+                auth: {
+                    ssid: ssid
+                },
+                data: {
+                    name: document.getElementById("project_name").value,
+                    description: document.getElementById("project_description").value,
+                }
+            }
+
+            if(!data.data.name) return alert("Project Name cannot be empty!")
+
+            let successCallback = function() {
+                console.log("Ok!!")
+                readProjects() // Improvement: add the element into view, instead of requesting the projects again
+                document.getElementById("project_name").value = ""
+                document.getElementById("project_description").value = ""
+            }
+
+            callApi("/createProject", data, successCallback, defaultFailureCallback_SSID_expired_variation)
+        }
+
+        function removeProject(clickedElement){
+            let data = {
+                auth: {
+                    ssid: ssid
+                },
+                data: {
+                    projectId: clickedElement.parentElement.parentElement.children[1].innerHTML
+                }
+            }
+
+            let successCallback = () => {
+                console.log("OK!!!")
+                readProjects() // Improvement: remove the element from our view only, instead of requesting the projects again
+            }
+
+            callApi("/deleteProject", data, successCallback, defaultFailureCallback_SSID_expired_variation)
+        }
+    </script>
+</body>
