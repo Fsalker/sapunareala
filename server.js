@@ -44,6 +44,8 @@ let express = require("express")
 let redis = require("redis")
 let bodyParser = require("body-parser")
 let bluebird = require("bluebird")
+let http = require("http")
+let https = require("https")
 //bluebird.promisifyAll(redis)
 
 // Custom Requires
@@ -79,9 +81,20 @@ async function main(){
         app.use(bodyParser.urlencoded({extended: true}))
         app.use(express.static("public"))
         app.use(getRouter(pg_client, redis_client))
-        app.listen(env.WEB_PORT, () => {
+
+        //let privateKey = fs.readFileSync("./certificate/xxx.key", "utf8")
+        //let certificate = fs.readFileSync("./certificate/xxx.crt", "utf8")
+
+        //let httpsCredentials = {key: privateKey, cert: certificate}
+        let httpServer = http.createServer(app);
+        //let httpsServer = https.createServer(httpsCredentials, app);
+
+        httpServer.listen(80);
+        //httpsServer.listen(443);
+
+        /*app.listen(env.WEB_PORT, () => {
             console.log(`Running Express Server on port ${env.WEB_PORT}`)
-        })
+        })*/
     } catch(e) { console.log(e)}
 }
 main()
