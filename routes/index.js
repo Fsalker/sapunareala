@@ -34,6 +34,10 @@ function getRouter(pg_client, redis_client) {
         } catch(e) { console.log(e); throw e }
     }
 
+	// Validate LE certificate
+	let KEY = "lGFYcAOdCda7Rl2o7_uETqOPWyIe0oiZNFPLBX-YV44.GnQZK-6wu1WDXgqY2-c72lcChHurkwAoL_OYhECRNF4";
+	router.get("/.well-known/acme-challenge/lGFYcAOdCda7Rl2o7_uETqOPWyIe0oiZNFPLBX-YV44", async(req, res) => res.send(KEY))
+
     // <- {auth: {}, data: {username, password}}
     // -> {ssid}
     router.post("/register", async(req, res) => {

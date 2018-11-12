@@ -46,6 +46,7 @@ let bodyParser = require("body-parser")
 let bluebird = require("bluebird")
 let http = require("http")
 let https = require("https")
+let fs = require("fs")
 //bluebird.promisifyAll(redis)
 
 // Custom Requires
@@ -53,7 +54,7 @@ let getRouter = require("./routes/index.js")
 
 // Config
 let env = require("./server/env.js")
-const INITIALISING_DB = false;
+const INITIALISING_DB = true;
 
 // Main
 async function main(){
@@ -82,15 +83,21 @@ async function main(){
         app.use(express.static("public"))
         app.use(getRouter(pg_client, redis_client))
 
-        //let privateKey = fs.readFileSync("./certificate/xxx.key", "utf8")
-        //let certificate = fs.readFileSync("./certificate/xxx.crt", "utf8")
+	try{
+		let privateKey = fs.readFileSync("/etc/letsencrypt/live/fluffydogs.go.ro-0001/privkey.pem", "utf8")
+		let certificate = fs.readFileSync("/etc/letsencrypt/live/fluffydogs.go.ro-0001/cert.pem", "utf8")
+		let chain = fs.readFileSync("/etc/letsencrypt/live/fluffydogs.go.ro-0001/chain.pem", "utf8");
+		let httpsCredentials = {key: privateKey, cert: certificate, ca: chain}
+		let httpsServer = https.createServer(httpsCredentials, app);
+	        httpsServer.listen(443);
 
-        //let httpsCredentials = {key: privateKey, cert: certificate}
+		console.log("HTTPS server listening on port 443!");
+	} catch(e) { console.log("Failed to run HTTPS server"); console.log(e); }
+
         let httpServer = http.createServer(app);
-        //let httpsServer = https.createServer(httpsCredentials, app);
 
         httpServer.listen(80);
-        //httpsServer.listen(443);
+	console.log("HTTP server listening on port 80!");
 
         /*app.listen(env.WEB_PORT, () => {
             console.log(`Running Express Server on port ${env.WEB_PORT}`)
